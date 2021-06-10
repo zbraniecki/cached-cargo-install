@@ -1,0 +1,32 @@
+name: 'Cargo install with caching'
+description: 'Cargo install using the github cache'
+inputs:
+  crate-name:
+    description: 'Name of crate to install'
+    required: true
+outputs:
+  cache-hit:
+    description: "Whether there was a cache hit"
+    value: ${{ steps.crate-cache.outputs.cache-hit }}
+runs:
+  using: "composite"
+  steps:
+    - name: Get ${{ inputs.crate-name }} version
+      id: crate-version
+      run: |
+        echo "::set-output name=hash::$(cargo search ${{ inputs.crate-name }} | grep '^${{ inputs.crate-name }} =' | md5sum)"
+      shell: bash
+    - name: Attempt to load cached ${{ inputs.crate-name }}
+      uses: actions/cache@v2
+      id: crate-cache
+      with:
+        path: |
+          ~/.cargo/bin/${{ inputs.crate-name }}
+          ~/.cargo/bin/${{ inputs.crate-name }}.exe
+        key: ${{ runner.os }}-${{ steps.crate-version.outputs.hash }}
+    - name: Install ${{ inputs.crate-name }}
+      if: steps.crate-cache.outputs.cache-hit != 'true'
+      uses: actions-rs/install@v0.1.2
+      with:
+        crate: ${{ inputs.crate-name }}
+        version: latest
